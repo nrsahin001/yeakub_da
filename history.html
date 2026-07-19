@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>History — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+  <div class="header-right">
+    <a href="home.html" style="color:#EAF2F4; font-size:14px;">&larr; Back to home</a>
+  </div>
+</div>
+
+<div class="dash-wrap">
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+    <h2 class="section-title">Watch History</h2>
+    <button class="btn btn-ghost" id="clearBtn" style="width:auto; padding:8px 16px;">Clear history</button>
+  </div>
+  <div class="batch-grid" id="batchGrid">
+    <div class="empty-state">Loading history...</div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireAuthOrRedirect();
+  const batchGrid = document.getElementById("batchGrid");
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function render(batches) {
+    if (!batches.length) {
+      batchGrid.innerHTML = `<div class="empty-state">You haven't viewed any batches yet.</div>`;
+      return;
+    }
+    batchGrid.innerHTML = batches.map((b) => `
+      <div class="batch-card" data-id="${b.id}" style="cursor:pointer;">
+        <div class="batch-thumb">${b.thumbnail_url ? `<img src="${b.thumbnail_url}" alt="${escapeHtml(b.title)}">` : escapeHtml(b.subject || "Batch")}</div>
+        <div class="batch-body">
+          <div class="batch-subject">${escapeHtml(b.subject || "General")}</div>
+          <h3 class="batch-title">${escapeHtml(b.title)}</h3>
+          <div class="batch-instructor">${b.instructor ? "By " + escapeHtml(b.instructor) : ""}</div>
+          <div class="batch-foot">
+            <span class="batch-price ${b.is_free ? "free" : ""}">${b.is_free ? "Free" : "₹" + b.price.toLocaleString("en-IN")}</span>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".batch-card").forEach((card) => {
+      card.addEventListener("click", () => { window.location.href = `batch-detail.html?id=${card.dataset.id}`; });
+    });
+  }
+
+  async function loadHistory() {
+    const res = await apiRequest("/api/history", { method: "GET", auth: true });
+    if (!res.success) { batchGrid.innerHTML = `<div class="empty-state">${escapeHtml(res.message || "Could not load history.")}</div>`; return; }
+    render(res.batches);
+  }
+
+  document.getElementById("clearBtn").addEventListener("click", async () => {
+    if (!confirm("Clear your entire watch history?")) return;
+    await apiRequest("/api/history", { method: "DELETE", auth: true });
+    loadHistory();
+  });
+
+  loadHistory();
+</script>
+</body>
+</html>

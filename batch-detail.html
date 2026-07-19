@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+
+<div class="topbar" style="display:flex; justify-content:space-between;">
+  <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+  <div class="header-right">
+    <a href="home.html" style="color:#EAF2F4; font-size:14px;">&larr; Back to home</a>
+  </div>
+</div>
+
+<div class="dash-wrap" id="dashWrap" style="max-width:760px;">
+  <div class="loading-block">Loading batch...</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireAuthOrRedirect();
+
+  // Best-effort deterrents only — screenshots and screen recording can't be
+  // blocked from a web page. This just discourages casual right-click-save
+  // and Ctrl+S / Ctrl+P on this page.
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && ["s", "p"].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+    }
+  });
+
+  const params = new URLSearchParams(window.location.search);
+  const batchId = params.get("id");
+  const dashWrap = document.getElementById("dashWrap");
+
+  if (!batchId) { window.location.href = "home.html"; }
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function contentIcon(type) {
+    if (type === "video") return "🎬";
+    if (type === "pdf") return "📄";
+    return "🖼️";
+  }
+
+  function renderContentItem(c) {
+    if (c.locked) {
+      return `
+        <div class="material-item locked">
+          <span class="material-icon">🔒</span>
+          <div class="material-body">
+            <div class="material-title">${escapeHtml(c.title)}</div>
+            <div class="material-sub">${contentIcon(c.content_type)} ${escapeHtml(c.content_type)} — purchase this batch to unlock</div>
+          </div>
+        </div>
+      `;
+    }
+
+    let viewer = "";
+    if (c.content_type === "video") {
+      viewer = c.stream_url
+        ? `<video class="material-video" src="${c.stream_url}" controls controlsList="nodownload noremoteplayback" disablePictureInPicture oncontextmenu="return false"></video>`
+        : `<div class="material-embed"><iframe src="${c.embed_url}" allowfullscreen frameborder="0"></iframe></div>`;
+    } else if (c.content_type === "pdf") {
+      viewer = `<div class="material-embed"><iframe src="${c.stream_url}#toolbar=0" oncontextmenu="return false"></iframe></div>`;
+    } else {
+      viewer = `<img class="material-image" src="${c.stream_url}" oncontextmenu="return false" draggable="false">`;
+    }
+
+    return `
+      <div class="material-item">
+        <div class="material-header">
+          <span class="material-icon">${contentIcon(c.content_type)}</span>
+          <div class="material-title">${escapeHtml(c.title)}</div>
+        </div>
+        ${viewer}
+      </div>
+    `;
+  }
+
+  function renderContentByDay(content) {
+    if (!content.length) return `<div class="info-row"><span class="k">No content added yet.</span></div>`;
+
+    const days = {};
+    content.forEach((c) => { (days[c.day_number] = days[c.day_number] || []).push(c); });
+
+    return Object.keys(days).sort((a, b) => a - b).map((day) => `
+      <div class="day-group">
+        <h4 class="day-heading">Day ${day}</h4>
+        ${days[day].map(renderContentItem).join("")}
+      </div>
+    `).join("");
+  }
+
+  function render(batch) {
+    const priceHtml = batch.is_free
+      ? `<span class="batch-price free">Free</span>`
+      : (batch.offer_price !== null
+          ? `<span><s style="color:var(--text-muted); font-weight:400;">₹${batch.price}</s> <span class="batch-price">₹${batch.offer_price}</span></span>`
+          : `<span class="batch-price">₹${batch.price}</span>`);
+
+    dashWrap.innerHTML = `
+      <div class="welcome-card">
+        <div class="eb-id">${escapeHtml(batch.subject || "Batch")}</div>
+        <h1>${escapeHtml(batch.title)}</h1>
+        <p>${escapeHtml(batch.instructor ? "By " + batch.instructor : "")}</p>
+      </div>
+
+      <div class="info-card" style="margin-bottom:20px;">
+        <h3>About this batch</h3>
+        <p style="font-size:14.5px; color:var(--text); line-height:1.6;">${escapeHtml(batch.description || "No description provided.")}</p>
+        <div class="info-row"><span class="k">Language</span><span class="v">${escapeHtml(batch.language || "—")}</span></div>
+        <div class="info-row"><span class="k">Price</span><span class="v">${priceHtml}</span></div>
+      </div>
+
+      ${!batch.is_enrolled && !batch.is_free ? `
+        <div class="info-card" style="margin-bottom:20px; text-align:center;">
+          <p style="font-size:13.5px; color:var(--text-muted); margin:0 0 4px;">🔒 Videos, PDFs, and images are locked until you purchase this batch.</p>
+        </div>
+      ` : ""}
+
+      <div class="info-card" style="margin-bottom:20px;">
+        <h3>Content</h3>
+        ${renderContentByDay(batch.content)}
+      </div>
+
+      <div id="enrollAlert" class="alert"></div>
+      <button class="btn btn-primary" id="enrollBtn" style="width:auto; padding:12px 26px;">
+        ${batch.is_enrolled ? "Already enrolled ✓" : (batch.is_free ? "Enroll for free" : "Buy now")}
+      </button>
+    `;
+
+    const enrollBtn = document.getElementById("enrollBtn");
+    if (batch.is_enrolled) {
+      enrollBtn.disabled = true;
+      return;
+    }
+
+    enrollBtn.addEventListener("click", () => handleEnroll(batch));
+  }
+
+  async function handleEnroll(batch) {
+    const alertBox = document.getElementById("enrollAlert");
+    hideAlert(alertBox);
+    const btn = document.getElementById("enrollBtn");
+    setLoading(btn, true, "Please wait...");
+
+    const res = await apiRequest("/api/payments/create-order", { method: "POST", auth: true, body: { batch_id: batch.id } });
+    setLoading(btn, false);
+
+    if (!res.success) { showAlert(alertBox, res.message || "Could not start enrollment."); return; }
+
+    if (res.free) {
+      showAlert(alertBox, "You're enrolled!", "success");
+      btn.textContent = "Already enrolled ✓";
+      btn.disabled = true;
+      return;
+    }
+
+    const user = JSON.parse(localStorage.getItem("eb_user") || "{}");
+
+    const options = {
+      key: res.key_id,
+      amount: res.amount,
+      currency: res.currency,
+      order_id: res.order_id,
+      name: "EB Portal",
+      description: batch.title,
+      prefill: {
+        name: [user.first_name, user.last_name].filter(Boolean).join(" "),
+        email: user.email,
+        contact: user.phone,
+      },
+      theme: { color: "#1BAA9C" },
+      handler: async function (response) {
+        const verifyRes = await apiRequest("/api/payments/verify", {
+          method: "POST", auth: true,
+          body: {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          },
+        });
+        if (verifyRes.success) {
+          showAlert(alertBox, "Payment successful! You're enrolled.", "success");
+          btn.textContent = "Already enrolled ✓";
+          btn.disabled = true;
+        } else {
+          showAlert(alertBox, verifyRes.message || "Payment verification failed.");
+        }
+      },
+      modal: {
+        ondismiss: function () { showAlert(alertBox, "Payment cancelled."); },
+      },
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+  }
+
+  async function loadBatch() {
+    const res = await apiRequest(`/api/batches/${batchId}`, { method: "GET", auth: true });
+    if (!res.success) {
+      dashWrap.innerHTML = `<div class="empty-state">${escapeHtml(res.message || "Could not load this batch.")}</div>`;
+      return;
+    }
+    await apiRequest(`/api/history/${batchId}`, { method: "POST", auth: true });
+    render(res.batch);
+  }
+
+  loadBatch();
+</script>
+</body>
+</html>

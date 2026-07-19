@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Favorites — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+  <div class="header-right">
+    <a href="home.html" style="color:#EAF2F4; font-size:14px;">&larr; Back to home</a>
+  </div>
+</div>
+
+<div class="dash-wrap">
+  <h2 class="section-title">Your Favorites</h2>
+  <div class="batch-grid" id="batchGrid">
+    <div class="empty-state">Loading favorites...</div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireAuthOrRedirect();
+  const batchGrid = document.getElementById("batchGrid");
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function render(batches) {
+    if (!batches.length) {
+      batchGrid.innerHTML = `<div class="empty-state">You haven't favorited any batches yet.</div>`;
+      return;
+    }
+    batchGrid.innerHTML = batches.map((b) => `
+      <div class="batch-card" data-id="${b.id}" style="cursor:pointer;">
+        <div class="batch-thumb">
+          ${b.thumbnail_url ? `<img src="${b.thumbnail_url}" alt="${escapeHtml(b.title)}">` : escapeHtml(b.subject || "Batch")}
+          <button class="fav-btn active" data-id="${b.id}" aria-label="Remove from favorites">❤</button>
+        </div>
+        <div class="batch-body">
+          <div class="batch-subject">${escapeHtml(b.subject || "General")}</div>
+          <h3 class="batch-title">${escapeHtml(b.title)}</h3>
+          <div class="batch-instructor">${b.instructor ? "By " + escapeHtml(b.instructor) : ""}</div>
+          <div class="batch-foot">
+            <span class="batch-price ${b.is_free ? "free" : ""}">${b.is_free ? "Free" : "₹" + b.price.toLocaleString("en-IN")}</span>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".fav-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        await apiRequest(`/api/favorites/${id}`, { method: "DELETE", auth: true });
+        loadFavorites();
+      });
+    });
+
+    document.querySelectorAll(".batch-card").forEach((card) => {
+      card.addEventListener("click", () => { window.location.href = `batch-detail.html?id=${card.dataset.id}`; });
+    });
+  }
+
+  async function loadFavorites() {
+    const res = await apiRequest("/api/favorites", { method: "GET", auth: true });
+    if (!res.success) { batchGrid.innerHTML = `<div class="empty-state">${escapeHtml(res.message || "Could not load favorites.")}</div>`; return; }
+    render(res.batches);
+  }
+
+  loadFavorites();
+</script>
+</body>
+</html>

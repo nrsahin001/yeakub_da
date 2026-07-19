@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+
+  <div class="header-search-desktop">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInputDesktop" placeholder="Search batches, subjects, instructors...">
+    </div>
+  </div>
+
+  <div class="header-right">
+    <button class="icon-btn mobile-only" id="mobileSearchBtn" aria-label="Search">🔍</button>
+
+    <button class="icon-btn" id="notifBtn" aria-label="Notifications">
+      🔔
+      <span class="notif-dot" id="notifDot" style="display:none;"></span>
+    </button>
+    <div class="notif-dropdown" id="notifDropdown">
+      <div class="notif-head">Notifications</div>
+      <div id="notifList"><div class="notif-empty">Loading...</div></div>
+    </div>
+
+    <button class="avatar-btn" id="avatarBtn" aria-label="Open account menu">
+      <span id="avatarInitial">?</span>
+      <img id="avatarImg" style="display:none;" alt="Profile photo">
+    </button>
+
+    <div class="avatar-dropdown" id="avatarDropdown">
+      <div class="dropdown-user">
+        <div class="dd-avatar" id="ddAvatar">
+          <span id="ddAvatarInitial">?</span>
+          <img id="ddAvatarImg" style="display:none;" alt="Profile photo">
+        </div>
+        <div>
+          <div class="dd-name" id="ddName">—</div>
+          <div class="dd-id" id="ddId">—</div>
+        </div>
+      </div>
+      <div class="dropdown-menu">
+        <button id="menuSettings"><span class="dd-icon">⚙️</span> Settings</button>
+        <button id="menuHistory"><span class="dd-icon">🕘</span> History</button>
+        <button id="menuFavorites"><span class="dd-icon">❤️</span> Favorites</button>
+        <button id="menuPurchased"><span class="dd-icon">🎓</span> Purchased</button>
+        <button data-theme-toggle id="menuTheme">
+          <span class="dd-icon" data-theme-icon>🖥️</span>
+          <span class="dd-label">Theme</span>
+          <span class="dd-mode" data-theme-label>Auto</span>
+        </button>
+        <div class="divider-line"></div>
+        <button id="menuLogout" class="danger"><span class="dd-icon">🚪</span> Log out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mobile-search-bar" id="mobileSearchBar">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInputMobile" placeholder="Search batches, subjects, instructors...">
+    </div>
+  </div>
+</div>
+
+<div class="dash-wrap">
+  <h2 class="section-title" id="sectionTitle">All Batches</h2>
+  <div class="batch-grid" id="batchGrid">
+    <div class="empty-state">Loading batches...</div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireAuthOrRedirect();
+
+  const avatarBtn = document.getElementById("avatarBtn");
+  const avatarDropdown = document.getElementById("avatarDropdown");
+  const notifBtn = document.getElementById("notifBtn");
+  const notifDropdown = document.getElementById("notifDropdown");
+  const mobileSearchBtn = document.getElementById("mobileSearchBtn");
+  const mobileSearchBar = document.getElementById("mobileSearchBar");
+  const batchGrid = document.getElementById("batchGrid");
+  const sectionTitle = document.getElementById("sectionTitle");
+  const searchInputs = document.querySelectorAll(".search-input");
+
+  let searchDebounce = null;
+
+  // ---------------- Avatar + dropdown ----------------
+
+  function applyAvatar(user) {
+    const initial = (user.first_name || "?").charAt(0).toUpperCase();
+    const photo = user.profile_photo_url;
+
+    ["avatarInitial", "ddAvatarInitial"].forEach((id) => { document.getElementById(id).textContent = initial; });
+
+    const avatarImg = document.getElementById("avatarImg");
+    const ddAvatarImg = document.getElementById("ddAvatarImg");
+    if (photo) {
+      avatarImg.src = photo; avatarImg.style.display = "block";
+      document.getElementById("avatarInitial").style.display = "none";
+      ddAvatarImg.src = photo; ddAvatarImg.style.display = "block";
+      document.getElementById("ddAvatarInitial").style.display = "none";
+    }
+
+    document.getElementById("ddName").textContent = [user.first_name, user.last_name].filter(Boolean).join(" ");
+    document.getElementById("ddId").textContent = user.user_id || "";
+  }
+
+  avatarBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    notifDropdown.classList.remove("open");
+    avatarDropdown.classList.toggle("open");
+  });
+
+  notifBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    avatarDropdown.classList.remove("open");
+    notifDropdown.classList.toggle("open");
+    if (notifDropdown.classList.contains("open")) markNotificationsSeen();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!avatarDropdown.contains(e.target) && e.target !== avatarBtn) {
+      avatarDropdown.classList.remove("open");
+    }
+    if (!notifDropdown.contains(e.target) && e.target !== notifBtn) {
+      notifDropdown.classList.remove("open");
+    }
+  });
+
+  mobileSearchBtn.addEventListener("click", () => {
+    mobileSearchBar.classList.toggle("open");
+    if (mobileSearchBar.classList.contains("open")) {
+      document.getElementById("searchInputMobile").focus();
+    }
+  });
+
+  document.getElementById("menuSettings").addEventListener("click", () => { window.location.href = "settings.html"; });
+  document.getElementById("menuHistory").addEventListener("click", () => { window.location.href = "history.html"; });
+  document.getElementById("menuFavorites").addEventListener("click", () => { window.location.href = "favorites.html"; });
+  document.getElementById("menuPurchased").addEventListener("click", () => { window.location.href = "purchased.html"; });
+  document.getElementById("menuLogout").addEventListener("click", () => {
+    Auth.clearToken();
+    localStorage.removeItem("eb_user");
+    window.location.href = "index.html";
+  });
+
+  // ---------------- Batches ----------------
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function renderBatches(batches) {
+    if (!batches.length) {
+      batchGrid.innerHTML = `<div class="empty-state">No batches found. Try a different search.</div>`;
+      return;
+    }
+
+    batchGrid.innerHTML = batches.map((b) => `
+      <div class="batch-card" data-id="${b.id}">
+        <div class="batch-thumb">
+          ${b.thumbnail_url ? `<img src="${b.thumbnail_url}" alt="${escapeHtml(b.title)}">` : escapeHtml(b.subject || "Batch")}
+          <button class="fav-btn ${b.is_favorite ? "active" : ""}" data-id="${b.id}" aria-label="Toggle favorite">❤</button>
+        </div>
+        <div class="batch-body">
+          <div class="batch-subject">${escapeHtml(b.subject || "General")}</div>
+          <h3 class="batch-title">${escapeHtml(b.title)}</h3>
+          <div class="batch-instructor">${b.instructor ? "By " + escapeHtml(b.instructor) : ""}</div>
+          <div class="batch-foot">
+            <span class="batch-price ${b.is_free ? "free" : ""}">${b.is_free ? "Free" : "₹" + b.price.toLocaleString("en-IN")}</span>
+            <button class="enroll-btn" data-id="${b.id}">View</button>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".fav-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const isActive = btn.classList.contains("active");
+        btn.classList.toggle("active");
+        const res = isActive
+          ? await apiRequest(`/api/favorites/${id}`, { method: "DELETE", auth: true })
+          : await apiRequest(`/api/favorites/${id}`, { method: "POST", auth: true });
+        if (!res.success) btn.classList.toggle("active"); // revert on failure
+      });
+    });
+
+    document.querySelectorAll(".enroll-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.location.href = `batch-detail.html?id=${btn.dataset.id}`;
+      });
+    });
+  }
+
+  async function loadBatches(search = "") {
+    sectionTitle.textContent = search ? `Results for "${search}"` : "All Batches";
+    const query = search ? `?search=${encodeURIComponent(search)}` : "";
+    const res = await apiRequest(`/api/batches${query}`, { method: "GET", auth: true });
+    if (!res.success) {
+      batchGrid.innerHTML = `<div class="empty-state">${escapeHtml(res.message || "Could not load batches.")}</div>`;
+      return;
+    }
+    renderBatches(res.batches);
+  }
+
+  searchInputs.forEach((input) => {
+    input.addEventListener("input", (e) => {
+      clearTimeout(searchDebounce);
+      const value = e.target.value.trim();
+      // keep both search boxes (desktop + mobile) in sync
+      searchInputs.forEach((other) => { if (other !== e.target) other.value = e.target.value; });
+      searchDebounce = setTimeout(() => loadBatches(value), 350);
+    });
+  });
+
+  async function loadProfileAndBatches() {
+    const res = await apiRequest("/api/profile", { method: "GET", auth: true });
+    if (!res.success) {
+      window.location.href = "index.html";
+      return;
+    }
+    localStorage.setItem("eb_user", JSON.stringify(res.user));
+    applyAvatar(res.user);
+    loadBatches();
+  }
+
+  // ---------------- Notifications ----------------
+
+  const NOTIF_SEEN_KEY = "eb_last_seen_notif_at";
+
+  function notifIcon(type) {
+    if (type === "image") return "🖼️";
+    if (type === "pdf") return "📄";
+    if (type === "video") return "🎬";
+    return "📢";
+  }
+
+  function timeAgo(iso) {
+    const diffMs = Date.now() - new Date(iso.replace(" ", "T") + "Z").getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  async function loadNotifications() {
+    const res = await apiRequest("/api/notifications", { method: "GET", auth: true });
+    const listEl = document.getElementById("notifList");
+    const dot = document.getElementById("notifDot");
+
+    if (!res.success || !res.notifications.length) {
+      listEl.innerHTML = `<div class="notif-empty">You're all caught up! No new notifications.</div>`;
+      dot.style.display = "none";
+      return;
+    }
+
+    listEl.innerHTML = res.notifications.map((n) => `
+      <div class="notif-item">
+        ${n.thumbnail_url
+          ? `<img class="notif-thumb" src="${n.thumbnail_url}" alt="">`
+          : `<div class="notif-thumb notif-thumb-icon">${notifIcon(n.attachment_type)}</div>`
+        }
+        <div class="notif-body">
+          <div class="notif-text">${escapeHtml(n.message)}</div>
+          <div class="notif-time">${timeAgo(n.created_at)}</div>
+        </div>
+      </div>
+    `).join("");
+
+    const lastSeen = localStorage.getItem(NOTIF_SEEN_KEY);
+    const newest = res.notifications[0].created_at;
+    dot.style.display = (!lastSeen || newest > lastSeen) ? "block" : "none";
+  }
+
+  function markNotificationsSeen() {
+    const dot = document.getElementById("notifDot");
+    if (dot.style.display !== "none") {
+      localStorage.setItem(NOTIF_SEEN_KEY, new Date().toISOString());
+      dot.style.display = "none";
+    }
+  }
+
+  loadNotifications();
+  loadProfileAndBatches();
+</script>
+</body>
+</html>

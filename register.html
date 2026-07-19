@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="brand-panel">
+    <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+    <div class="brand-tagline">Register once. Get a permanent EB ID you'll use for everything, everywhere.</div>
+    <div class="brand-foot">&copy; 2026 EB Portal. All rights reserved.</div>
+  </aside>
+
+  <main class="form-panel">
+    <div class="form-card wide">
+      <div class="mobile-brand"><span class="id-chip">EB</span> EB Portal</div>
+      <h1 class="card-title">Create your account</h1>
+      <p class="card-sub">We'll send a one-time code to verify your email before your EB ID is issued.</p>
+
+      <div id="alertBox" class="alert"></div>
+
+      <form id="registerForm" novalidate>
+        <div class="field-row cols-3">
+          <div>
+            <label for="firstName">First name</label>
+            <input type="text" id="firstName" required autocomplete="given-name">
+          </div>
+          <div>
+            <label for="middleName">Middle name <span class="optional">(optional)</span></label>
+            <input type="text" id="middleName" autocomplete="additional-name">
+          </div>
+          <div>
+            <label for="lastName">Last name</label>
+            <input type="text" id="lastName" required autocomplete="family-name">
+          </div>
+        </div>
+
+        <div class="field-row cols-2">
+          <div>
+            <label for="phone">Phone number</label>
+            <input type="tel" id="phone" placeholder="+91 98765 43210" required autocomplete="tel">
+          </div>
+          <div>
+            <label for="email">Email address</label>
+            <input type="email" id="email" placeholder="you@example.com" required autocomplete="email">
+          </div>
+        </div>
+
+        <div class="field-row cols-2">
+          <div>
+            <label for="college">College</label>
+            <input type="text" id="college" required autocomplete="organization">
+          </div>
+          <div>
+            <label for="university">University</label>
+            <input type="text" id="university" required>
+          </div>
+        </div>
+
+        <div class="field-row cols-2">
+          <div>
+            <label for="course">Course</label>
+            <input type="text" id="course" placeholder="e.g. B.Tech CSE" required>
+          </div>
+          <div>
+            <label for="semester">Semester</label>
+            <select id="semester" required>
+              <option value="" disabled selected>Select semester</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option>
+              <option>5</option><option>6</option><option>7</option><option>8</option>
+              <option>9</option><option>10</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row cols-2">
+          <div>
+            <label for="password">Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="password" required minlength="6" autocomplete="new-password">
+              <button type="button" class="pw-toggle" data-target="password">Show</button>
+            </div>
+          </div>
+          <div>
+            <label for="confirmPassword">Confirm password</label>
+            <div class="pw-wrap">
+              <input type="password" id="confirmPassword" required minlength="6" autocomplete="new-password">
+              <button type="button" class="pw-toggle" data-target="confirmPassword">Show</button>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="registerBtn" style="margin-top:8px;">Create account</button>
+      </form>
+
+      <div class="form-foot">
+        Already have an account? <a href="index.html">Log in</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  if (Auth.isLoggedIn()) {
+    window.location.href = "home.html";
+  }
+
+  document.querySelectorAll(".pw-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = document.getElementById(btn.dataset.target);
+      if (input.type === "password") { input.type = "text"; btn.textContent = "Hide"; }
+      else { input.type = "password"; btn.textContent = "Show"; }
+    });
+  });
+
+  const form = document.getElementById("registerForm");
+  const alertBox = document.getElementById("alertBox");
+  const registerBtn = document.getElementById("registerBtn");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideAlert(alertBox);
+
+    const payload = {
+      first_name: document.getElementById("firstName").value.trim(),
+      middle_name: document.getElementById("middleName").value.trim(),
+      last_name: document.getElementById("lastName").value.trim(),
+      phone: document.getElementById("phone").value.trim(),
+      email: document.getElementById("email").value.trim(),
+      college: document.getElementById("college").value.trim(),
+      university: document.getElementById("university").value.trim(),
+      course: document.getElementById("course").value.trim(),
+      semester: document.getElementById("semester").value,
+      password: document.getElementById("password").value,
+    };
+    const confirmPassword = document.getElementById("confirmPassword").value;
+
+    if (!payload.first_name || !payload.last_name || !payload.phone || !payload.email ||
+        !payload.college || !payload.university || !payload.course || !payload.semester) {
+      showAlert(alertBox, "Please fill in all required fields.");
+      return;
+    }
+    if (payload.password.length < 6) {
+      showAlert(alertBox, "Password must be at least 6 characters.");
+      return;
+    }
+    if (payload.password !== confirmPassword) {
+      showAlert(alertBox, "Passwords do not match.");
+      return;
+    }
+
+    setLoading(registerBtn, true, "Creating account...");
+    const res = await apiRequest("/api/register", { method: "POST", body: payload });
+    setLoading(registerBtn, false);
+
+    if (!res.success) {
+      showAlert(alertBox, res.message || "Registration failed.");
+      return;
+    }
+
+    Auth.setPendingEmail(payload.email);
+    showAlert(alertBox, "OTP sent! Redirecting to verification...", "success");
+    setTimeout(() => { window.location.href = "verify-otp.html"; }, 900);
+  });
+</script>
+</body>
+</html>

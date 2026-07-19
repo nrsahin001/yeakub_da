@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="topbar" style="display:flex; justify-content:space-between;">
+  <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+  <div class="header-right">
+    <a href="home.html" style="color:#EAF2F4; font-size:14px;">&larr; Back to home</a>
+  </div>
+</div>
+
+<div class="dash-wrap" style="max-width:600px;">
+  <h2 class="section-title">Settings</h2>
+
+  <!-- Profile photo -->
+  <div class="info-card" style="margin-bottom:20px;">
+    <h3>Profile photo</h3>
+    <div style="display:flex; align-items:center; gap:18px; margin-top:6px;">
+      <div class="dd-avatar" style="width:72px; height:72px; font-size:26px;">
+        <span id="settingsAvatarInitial">?</span>
+        <img id="settingsAvatarImg" style="display:none;" alt="Profile photo">
+      </div>
+      <div>
+        <input type="file" id="photoInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;">
+        <button class="btn btn-ghost" id="chooseBtn" style="width:auto; padding:8px 16px;">Change photo</button>
+        <div style="font-size:12.5px; color:var(--text-muted); margin-top:8px;">PNG, JPG, WEBP or GIF. Max 5MB.</div>
+      </div>
+    </div>
+    <div id="photoAlert" class="alert" style="margin-top:14px;"></div>
+  </div>
+
+  <!-- Read-only, permanent fields -->
+  <div class="info-card" style="margin-bottom:20px;">
+    <h3>Permanent details</h3>
+    <div class="info-row"><span class="k">EB ID</span><span class="v" id="valId">—</span></div>
+    <div class="info-row"><span class="k">Phone number</span><span class="v" id="valPhone">—</span></div>
+    <div style="font-size:12.5px; color:var(--text-muted); margin-top:10px;">Your EB ID and phone number are fixed and can't be changed.</div>
+  </div>
+
+  <!-- Editable profile fields -->
+  <div class="info-card" style="margin-bottom:20px;">
+    <h3>Profile details</h3>
+    <div id="profileAlert" class="alert"></div>
+    <form id="profileForm" novalidate>
+      <div class="field-row cols-3">
+        <div><label for="firstName">First name</label><input type="text" id="firstName" required></div>
+        <div><label for="middleName">Middle name <span class="optional">(optional)</span></label><input type="text" id="middleName"></div>
+        <div><label for="lastName">Last name</label><input type="text" id="lastName" required></div>
+      </div>
+      <div class="field-row cols-2">
+        <div><label for="college">College</label><input type="text" id="college"></div>
+        <div><label for="university">University</label><input type="text" id="university"></div>
+      </div>
+      <div class="field-row cols-2">
+        <div><label for="course">Course</label><input type="text" id="course"></div>
+        <div>
+          <label for="semester">Semester</label>
+          <select id="semester">
+            <option value="">—</option>
+            <option>1</option><option>2</option><option>3</option><option>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option>
+            <option>9</option><option>10</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" id="saveProfileBtn" style="margin-top:6px;">Save changes</button>
+    </form>
+  </div>
+
+  <!-- Password -->
+  <div class="info-card" style="margin-bottom:20px;">
+    <h3>Password</h3>
+    <p class="card-sub" style="margin:0 0 14px;">To change your password, use the "Forgot password" flow — it verifies you by OTP before setting a new one.</p>
+    <button class="btn btn-ghost" id="goForgotPasswordBtn" style="width:auto; padding:9px 18px;">Change password</button>
+  </div>
+
+  <!-- Email change (multi-step OTP) -->
+  <div class="info-card">
+    <h3>Change email</h3>
+    <div class="info-row"><span class="k">Current email</span><span class="v" id="valEmail">—</span></div>
+    <div id="emailAlert" class="alert" style="margin-top:12px;"></div>
+
+    <!-- Step 0: start -->
+    <div id="emailStep0">
+      <button class="btn btn-ghost" id="startEmailChangeBtn" style="width:auto; padding:9px 18px; margin-top:6px;">Change email</button>
+    </div>
+
+    <!-- Step 1: OTP sent to OLD email -->
+    <div id="emailStep1" style="display:none; margin-top:10px;">
+      <p class="card-sub" style="margin:0 0 14px;">To confirm it's you, enter the OTP sent to your current email <strong id="oldEmailLabel"></strong>.</p>
+      <div class="field-row"><div><input type="text" id="oldOtpInput" maxlength="6" placeholder="6-digit OTP"></div></div>
+      <button class="btn btn-primary" id="verifyOldOtpBtn" style="width:auto; padding:10px 18px;">Verify</button>
+      <button class="btn btn-ghost" id="cancelStep1Btn" style="width:auto; padding:10px 18px;">Cancel</button>
+    </div>
+
+    <!-- Step 2: enter new email -->
+    <div id="emailStep2" style="display:none; margin-top:10px;">
+      <p class="card-sub" style="margin:0 0 14px;">Identity confirmed. Enter your new email address.</p>
+      <div class="field-row"><div><label for="newEmailInput">New email</label><input type="email" id="newEmailInput" placeholder="new@example.com"></div></div>
+      <button class="btn btn-primary" id="sendNewOtpBtn" style="width:auto; padding:10px 18px;">Send OTP to new email</button>
+      <button class="btn btn-ghost" id="cancelStep2Btn" style="width:auto; padding:10px 18px;">Cancel</button>
+    </div>
+
+    <!-- Step 3: OTP sent to NEW email -->
+    <div id="emailStep3" style="display:none; margin-top:10px;">
+      <p class="card-sub" style="margin:0 0 14px;">Enter the OTP sent to <strong id="newEmailLabel"></strong> to confirm it's yours.</p>
+      <div class="field-row"><div><input type="text" id="newOtpInput" maxlength="6" placeholder="6-digit OTP"></div></div>
+      <button class="btn btn-primary" id="confirmNewOtpBtn" style="width:auto; padding:10px 18px;">Confirm & update email</button>
+      <button class="btn btn-ghost" id="cancelStep3Btn" style="width:auto; padding:10px 18px;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireAuthOrRedirect();
+
+  let currentUser = null;
+  let actionToken = null;
+  let pendingNewEmail = null;
+
+  // ---------------- Photo upload ----------------
+
+  const photoInput = document.getElementById("photoInput");
+  const chooseBtn = document.getElementById("chooseBtn");
+  const photoAlert = document.getElementById("photoAlert");
+
+  chooseBtn.addEventListener("click", () => photoInput.click());
+
+  function setAvatarImage(url) {
+    const img = document.getElementById("settingsAvatarImg");
+    const initial = document.getElementById("settingsAvatarInitial");
+    if (url) { img.src = url; img.style.display = "block"; initial.style.display = "none"; }
+  }
+
+  photoInput.addEventListener("change", async () => {
+    const file = photoInput.files[0];
+    if (!file) return;
+    hideAlert(photoAlert);
+    setLoading(chooseBtn, true, "Uploading...");
+    const res = await apiUpload("/api/profile/photo", file, "photo");
+    setLoading(chooseBtn, false);
+    if (!res.success) { showAlert(photoAlert, res.message || "Upload failed."); return; }
+    setAvatarImage(res.photo_url);
+    showAlert(photoAlert, "Profile photo updated.", "success");
+    const stored = JSON.parse(localStorage.getItem("eb_user") || "{}");
+    stored.profile_photo_url = res.photo_url;
+    localStorage.setItem("eb_user", JSON.stringify(stored));
+  });
+
+  // ---------------- Profile fields ----------------
+
+  const profileForm = document.getElementById("profileForm");
+  const profileAlert = document.getElementById("profileAlert");
+  const saveProfileBtn = document.getElementById("saveProfileBtn");
+
+  profileForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideAlert(profileAlert);
+
+    const payload = {
+      first_name: document.getElementById("firstName").value.trim(),
+      middle_name: document.getElementById("middleName").value.trim(),
+      last_name: document.getElementById("lastName").value.trim(),
+      college: document.getElementById("college").value.trim(),
+      university: document.getElementById("university").value.trim(),
+      course: document.getElementById("course").value.trim(),
+      semester: document.getElementById("semester").value,
+    };
+
+    if (!payload.first_name || !payload.last_name) {
+      showAlert(profileAlert, "First name and last name are required.");
+      return;
+    }
+
+    setLoading(saveProfileBtn, true, "Saving...");
+    const res = await apiRequest("/api/settings/update", { method: "POST", body: payload, auth: true });
+    setLoading(saveProfileBtn, false);
+
+    if (!res.success) { showAlert(profileAlert, res.message || "Update failed."); return; }
+    showAlert(profileAlert, "Profile updated.", "success");
+    localStorage.setItem("eb_user", JSON.stringify(res.user));
+  });
+
+  // ---------------- Password (redirect to Forgot Password flow) ----------------
+
+  document.getElementById("goForgotPasswordBtn").addEventListener("click", () => {
+    Auth.clearToken();
+    localStorage.removeItem("eb_user");
+    window.location.href = "forgot-password.html";
+  });
+
+  // ---------------- Email change (4-step OTP flow) ----------------
+
+  const emailAlert = document.getElementById("emailAlert");
+  const steps = [0, 1, 2, 3].map((n) => document.getElementById(`emailStep${n}`));
+
+  function showStep(n) {
+    steps.forEach((el, i) => { el.style.display = i === n ? "block" : "none"; });
+  }
+
+  function resetEmailFlow() {
+    actionToken = null;
+    pendingNewEmail = null;
+    hideAlert(emailAlert);
+    showStep(0);
+  }
+
+  document.getElementById("startEmailChangeBtn").addEventListener("click", async () => {
+    hideAlert(emailAlert);
+    const btn = document.getElementById("startEmailChangeBtn");
+    setLoading(btn, true, "Sending...");
+    const res = await apiRequest("/api/settings/email/send-old-otp", { method: "POST", auth: true });
+    setLoading(btn, false);
+    if (!res.success) { showAlert(emailAlert, res.message || "Could not send OTP."); return; }
+    document.getElementById("oldEmailLabel").textContent = currentUser.email;
+    showStep(1);
+  });
+
+  document.getElementById("cancelStep1Btn").addEventListener("click", resetEmailFlow);
+  document.getElementById("cancelStep2Btn").addEventListener("click", resetEmailFlow);
+  document.getElementById("cancelStep3Btn").addEventListener("click", resetEmailFlow);
+
+  document.getElementById("verifyOldOtpBtn").addEventListener("click", async () => {
+    hideAlert(emailAlert);
+    const otp = document.getElementById("oldOtpInput").value.trim();
+    if (otp.length !== 6) { showAlert(emailAlert, "Enter the 6-digit OTP."); return; }
+    const btn = document.getElementById("verifyOldOtpBtn");
+    setLoading(btn, true, "Verifying...");
+    const res = await apiRequest("/api/settings/email/verify-old-otp", { method: "POST", auth: true, body: { otp } });
+    setLoading(btn, false);
+    if (!res.success) { showAlert(emailAlert, res.message || "Verification failed."); return; }
+    actionToken = res.action_token;
+    showStep(2);
+  });
+
+  document.getElementById("sendNewOtpBtn").addEventListener("click", async () => {
+    hideAlert(emailAlert);
+    const newEmail = document.getElementById("newEmailInput").value.trim().toLowerCase();
+    if (!newEmail) { showAlert(emailAlert, "Enter your new email address."); return; }
+    const btn = document.getElementById("sendNewOtpBtn");
+    setLoading(btn, true, "Sending...");
+    const res = await apiRequest("/api/settings/email/send-new-otp", {
+      method: "POST", auth: true, body: { new_email: newEmail, action_token: actionToken },
+    });
+    setLoading(btn, false);
+    if (!res.success) { showAlert(emailAlert, res.message || "Could not send OTP."); return; }
+    pendingNewEmail = newEmail;
+    document.getElementById("newEmailLabel").textContent = newEmail;
+    showStep(3);
+  });
+
+  document.getElementById("confirmNewOtpBtn").addEventListener("click", async () => {
+    hideAlert(emailAlert);
+    const otp = document.getElementById("newOtpInput").value.trim();
+    if (otp.length !== 6) { showAlert(emailAlert, "Enter the 6-digit OTP."); return; }
+    const btn = document.getElementById("confirmNewOtpBtn");
+    setLoading(btn, true, "Confirming...");
+    const res = await apiRequest("/api/settings/email/confirm-new-otp", {
+      method: "POST", auth: true, body: { new_email: pendingNewEmail, otp, action_token: actionToken },
+    });
+    setLoading(btn, false);
+    if (!res.success) { showAlert(emailAlert, res.message || "Could not confirm email."); return; }
+
+    Auth.setToken(res.token);
+    document.getElementById("valEmail").textContent = res.email;
+    const stored = JSON.parse(localStorage.getItem("eb_user") || "{}");
+    stored.email = res.email;
+    localStorage.setItem("eb_user", JSON.stringify(stored));
+    currentUser.email = res.email;
+
+    resetEmailFlow();
+    showAlert(emailAlert, "Email updated successfully.", "success");
+  });
+
+  // ---------------- Load profile ----------------
+
+  async function loadProfile() {
+    const res = await apiRequest("/api/profile", { method: "GET", auth: true });
+    if (!res.success) { window.location.href = "index.html"; return; }
+    currentUser = res.user;
+
+    document.getElementById("settingsAvatarInitial").textContent = (currentUser.first_name || "?").charAt(0).toUpperCase();
+    if (currentUser.profile_photo_url) setAvatarImage(currentUser.profile_photo_url);
+
+    document.getElementById("valId").textContent = currentUser.user_id || "—";
+    document.getElementById("valPhone").textContent = currentUser.phone || "—";
+    document.getElementById("valEmail").textContent = currentUser.email || "—";
+
+    document.getElementById("firstName").value = currentUser.first_name || "";
+    document.getElementById("middleName").value = currentUser.middle_name || "";
+    document.getElementById("lastName").value = currentUser.last_name || "";
+    document.getElementById("college").value = currentUser.college || "";
+    document.getElementById("university").value = currentUser.university || "";
+    document.getElementById("course").value = currentUser.course || "";
+    document.getElementById("semester").value = currentUser.semester || "";
+  }
+
+  loadProfile();
+</script>
+</body>
+</html>

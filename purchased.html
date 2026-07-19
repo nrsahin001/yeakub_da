@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Purchased — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="topbar" style="display:flex; justify-content:space-between;">
+  <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+  <div class="header-right">
+    <a href="home.html" style="color:#EAF2F4; font-size:14px;">&larr; Back to home</a>
+  </div>
+</div>
+
+<div class="dash-wrap">
+  <h2 class="section-title">Purchased Batches</h2>
+  <div class="batch-grid" id="batchGrid">
+    <div class="empty-state">Loading...</div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireAuthOrRedirect();
+  const batchGrid = document.getElementById("batchGrid");
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function render(batches) {
+    if (!batches.length) {
+      batchGrid.innerHTML = `<div class="empty-state">You haven't purchased or enrolled in any batches yet.</div>`;
+      return;
+    }
+    batchGrid.innerHTML = batches.map((b) => `
+      <div class="batch-card" data-id="${b.id}" style="cursor:pointer;">
+        <div class="batch-thumb">${b.thumbnail_url ? `<img src="${b.thumbnail_url}" alt="${escapeHtml(b.title)}">` : escapeHtml(b.subject || "Batch")}</div>
+        <div class="batch-body">
+          <div class="batch-subject">${escapeHtml(b.subject || "General")}</div>
+          <h3 class="batch-title">${escapeHtml(b.title)}</h3>
+          <div class="batch-instructor">${b.instructor ? "By " + escapeHtml(b.instructor) : ""}</div>
+          <div class="batch-foot">
+            <span class="batch-price free">${b.amount_paid > 0 ? "Paid ₹" + b.amount_paid : "Free"}</span>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".batch-card").forEach((card) => {
+      card.addEventListener("click", () => { window.location.href = `batch-detail.html?id=${card.dataset.id}`; });
+    });
+  }
+
+  async function loadPurchased() {
+    const res = await apiRequest("/api/enrollments", { method: "GET", auth: true });
+    if (!res.success) { batchGrid.innerHTML = `<div class="empty-state">${escapeHtml(res.message || "Could not load your batches.")}</div>`; return; }
+    render(res.batches);
+  }
+
+  loadPurchased();
+</script>
+</body>
+</html>
