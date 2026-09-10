@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verify Email — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="brand-panel">
+    <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+    <div class="brand-tagline">Almost there. Confirm it's really you and we'll issue your EB ID.</div>
+    <div class="brand-foot">&copy; 2026 EB Portal. All rights reserved.</div>
+  </aside>
+
+  <main class="form-panel">
+    <div class="form-card">
+      <div class="mobile-brand"><span class="id-chip">EB</span> EB Portal</div>
+      <h1 class="card-title">Verify your email</h1>
+      <p class="card-sub" id="emailSub">Enter the 6-digit code we sent to your email.</p>
+
+      <div id="alertBox" class="alert"></div>
+
+      <form id="otpForm" novalidate>
+        <div class="otp-row">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit" autocomplete="one-time-code">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
+        </div>
+
+        <div class="otp-timer">
+          Didn't get the code?
+          <button type="button" class="resend-link" id="resendBtn" disabled>Resend OTP (<span id="timer">60</span>s)</button>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="verifyBtn">Verify email</button>
+      </form>
+
+      <div class="form-foot">
+        Wrong email? <a href="register.html">Go back</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  const email = Auth.getPendingEmail();
+  if (!email) {
+    window.location.href = "register.html";
+  }
+  document.getElementById("emailSub").textContent = `Enter the 6-digit code we sent to ${email}.`;
+
+  const digits = Array.from(document.querySelectorAll(".otp-digit"));
+  digits.forEach((input, idx) => {
+    input.addEventListener("input", () => {
+      input.value = input.value.replace(/[^0-9]/g, "").slice(0, 1);
+      if (input.value && idx < digits.length - 1) digits[idx + 1].focus();
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Backspace" && !input.value && idx > 0) digits[idx - 1].focus();
+    });
+    input.addEventListener("paste", (e) => {
+      const pasted = (e.clipboardData || window.clipboardData).getData("text").replace(/[^0-9]/g, "");
+      if (pasted.length) {
+        e.preventDefault();
+        pasted.slice(0, 6).split("").forEach((ch, i) => { if (digits[i]) digits[i].value = ch; });
+        digits[Math.min(pasted.length, 6) - 1].focus();
+      }
+    });
+  });
+
+  const form = document.getElementById("otpForm");
+  const alertBox = document.getElementById("alertBox");
+  const verifyBtn = document.getElementById("verifyBtn");
+  const resendBtn = document.getElementById("resendBtn");
+  const timerEl = document.getElementById("timer");
+
+  let countdown = 60;
+  let timerInterval = setInterval(() => {
+    countdown -= 1;
+    timerEl.textContent = countdown;
+    if (countdown <= 0) {
+      clearInterval(timerInterval);
+      resendBtn.disabled = false;
+      resendBtn.textContent = "Resend OTP";
+    }
+  }, 1000);
+
+  resendBtn.addEventListener("click", async () => {
+    hideAlert(alertBox);
+    resendBtn.disabled = true;
+    const res = await apiRequest("/api/resend-otp", { method: "POST", body: { email, purpose: "register" } });
+    if (res.success) {
+      showAlert(alertBox, "A new OTP has been sent.", "success");
+      countdown = 60;
+      timerEl.textContent = countdown;
+      resendBtn.textContent = `Resend OTP (${countdown}s)`;
+      timerInterval = setInterval(() => {
+        countdown -= 1;
+        timerEl.textContent = countdown;
+        resendBtn.textContent = `Resend OTP (${countdown}s)`;
+        if (countdown <= 0) {
+          clearInterval(timerInterval);
+          resendBtn.disabled = false;
+          resendBtn.textContent = "Resend OTP";
+        }
+      }, 1000);
+    } else {
+      showAlert(alertBox, res.message || "Could not resend OTP.");
+      resendBtn.disabled = false;
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideAlert(alertBox);
+
+    const otp = digits.map((d) => d.value).join("");
+    if (otp.length !== 6) {
+      showAlert(alertBox, "Please enter the full 6-digit code.");
+      return;
+    }
+
+    setLoading(verifyBtn, true, "Verifying...");
+    const res = await apiRequest("/api/verify-otp", { method: "POST", body: { email, otp } });
+    setLoading(verifyBtn, false);
+
+    if (!res.success) {
+      showAlert(alertBox, res.message || "Verification failed.");
+      return;
+    }
+
+    Auth.setToken(res.token);
+    showAlert(alertBox, `Verified! Your EB ID is ${res.user_id}. Redirecting...`, "success");
+    setTimeout(() => { window.location.href = "home.html"; }, 1200);
+  });
+</script>
+</body>
+</html>

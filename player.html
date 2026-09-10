@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player — EB Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+</head>
+<body>
+
+<div class="topbar" style="display:flex; justify-content:space-between;">
+  <div class="brand-mark"><span class="id-chip">EB</span> <span class="brand-word">EB Portal</span></div>
+  <div class="header-right">
+    <a href="#" id="backLink" style="color:#EAF2F4; font-size:14px;">&larr; Back to batch</a>
+  </div>
+</div>
+
+<div class="dash-wrap" id="dashWrap" style="max-width:820px;">
+  <div class="loading-block">Loading...</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireAuthOrRedirect();
+
+  // Best-effort deterrents only — screenshots and screen recording can't be
+  // blocked from a web page. This just discourages casual right-click-save
+  // and Ctrl+S / Ctrl+P on this page.
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && ["s", "p"].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+    }
+  });
+
+  const params = new URLSearchParams(window.location.search);
+  const batchId = params.get("batch_id");
+  const contentId = params.get("content_id");
+  const dashWrap = document.getElementById("dashWrap");
+
+  if (!batchId || !contentId) { window.location.href = "home.html"; }
+  document.getElementById("backLink").href = `batch-detail.html?id=${batchId}`;
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function contentIcon(type) {
+    if (type === "video") return "🎬";
+    if (type === "audio") return "🎧";
+    if (type === "pdf") return "📄";
+    return "🖼️";
+  }
+
+  function renderLocked(batch) {
+    dashWrap.innerHTML = `
+      <div class="welcome-card">
+        <h1>🔒 Locked</h1>
+        <p>This material is part of "${escapeHtml(batch.title)}" and isn't available in the free preview.</p>
+      </div>
+      <div class="info-card" style="text-align:center;">
+        <p style="font-size:14.5px; color:var(--text); margin:0 0 16px;">Purchase this batch to unlock all videos, audio, PDFs, and images.</p>
+        <a class="btn btn-primary" style="width:auto; padding:11px 26px; display:inline-flex;" href="batch-detail.html?id=${batchId}">View batch &amp; purchase</a>
+      </div>
+    `;
+  }
+
+  function renderPlayer(batch, item) {
+    let playerHtml = "";
+
+    if (item.content_type === "video") {
+      playerHtml = item.stream_url
+        ? `<video class="player-video" src="${item.stream_url}" controls autoplay controlsList="nodownload noremoteplayback" disablePictureInPicture oncontextmenu="return false"></video>`
+        : `<div class="player-embed"><iframe src="${item.embed_url}" allow="autoplay; encrypted-media" allowfullscreen frameborder="0"></iframe></div>`;
+    } else if (item.content_type === "audio") {
+      playerHtml = `
+        <div class="audio-player-shell">
+          <div class="audio-art">🎧</div>
+          <audio class="player-audio" src="${item.stream_url}" controls controlsList="nodownload" oncontextmenu="return false"></audio>
+        </div>
+      `;
+    } else if (item.content_type === "pdf") {
+      playerHtml = `<div class="player-embed pdf"><iframe src="${item.stream_url}#toolbar=0" oncontextmenu="return false"></iframe></div>`;
+    } else {
+      playerHtml = `<div class="image-player-shell"><img class="player-image" src="${item.stream_url}" oncontextmenu="return false" draggable="false"></div>`;
+    }
+
+    dashWrap.innerHTML = `
+      <div class="player-head">
+        <div class="player-day">Day ${item.day_number}${item.is_demo ? ` · <span class="badge badge-active">Demo</span>` : ""}</div>
+        <h1 class="player-title">${contentIcon(item.content_type)} ${escapeHtml(item.title)}</h1>
+        <div class="player-batch-link"><a href="batch-detail.html?id=${batchId}">${escapeHtml(batch.title)}</a></div>
+      </div>
+      <div class="player-stage">
+        ${playerHtml}
+      </div>
+    `;
+  }
+
+  async function loadAndRender() {
+    const res = await apiRequest(`/api/batches/${batchId}`, { method: "GET", auth: true });
+    if (!res.success) {
+      dashWrap.innerHTML = `<div class="empty-state">${escapeHtml(res.message || "Could not load this batch.")}</div>`;
+      return;
+    }
+
+    const item = res.batch.content.find((c) => String(c.id) === String(contentId));
+    if (!item) {
+      dashWrap.innerHTML = `<div class="empty-state">This material could not be found.</div>`;
+      return;
+    }
+
+    if (item.locked) {
+      renderLocked(res.batch);
+      return;
+    }
+
+    renderPlayer(res.batch, item);
+  }
+
+  loadAndRender();
+</script>
+</body>
+</html>
